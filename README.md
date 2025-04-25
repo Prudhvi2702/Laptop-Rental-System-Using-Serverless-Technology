@@ -3,7 +3,7 @@ A full-stack web application for renting laptops, featuring a dynamic React fron
 
 Features:
 
-Interactive 3D laptop models (10MB .glb) rendered with Three.js.
+Interactive 3D laptop models (Laptop.glb) rendered with Three.js.
 User authentication and authorization via AWS Cognito.
 RESTful API for rental management (e.g., create rentals, view inventory).
 Responsive React frontend with seamless API integration.
