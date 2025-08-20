@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
+import { confirmUser } from "@/lib/api"
 
 export default function ConfirmPage() {
   const router = useRouter()
@@ -36,39 +37,43 @@ export default function ConfirmPage() {
     }
 
     setIsLoading(true)
+    setError("")
 
     try {
-      const response = await fetch("https://uijoj390ad.execute-api.us-east-1.amazonaws.com/prod/users/confirm", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: email,
-          confirmation_code: confirmationCode,
-        }),
+      console.log("Submitting confirmation data:", {
+        username: email,
+        confirmation_code: confirmationCode,
       })
 
-      const data = await response.json()
+      // Use centralized API function
+      const data = await confirmUser(email, confirmationCode)
 
-      if (!response.ok) {
-        throw new Error(data.error || "Confirmation failed")
-      }
+      console.log("Confirmation response:", data)
 
       toast({
         title: "Account confirmed!",
         description: "You can now log in to your account.",
       })
 
-      // Redirect to login page
-      router.push("/login")
+      // Redirect to login page after a short delay to show the toast
+      setTimeout(() => {
+        console.log("Redirecting to login page after successful confirmation")
+        router.push("/login")
+      }, 2000)
     } catch (error) {
+      console.error("Confirmation error:", error)
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      })
+      const errorMessage = error.message || "Confirmation failed. Please try again."
       toast({
         title: "Confirmation failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       })
-      setError(error.message)
+      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }

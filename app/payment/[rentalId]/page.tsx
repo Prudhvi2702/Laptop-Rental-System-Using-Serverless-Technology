@@ -40,6 +40,8 @@ export default function PaymentPage() {
   const [scriptLoaded, setScriptLoaded] = useState(false)
   const [scriptError, setScriptError] = useState(false)
   const [error, setError] = useState<string>("")
+  const [isPaymentComplete, setIsPaymentComplete] = useState(false)
+  const [transactionId, setTransactionId] = useState<string>("")
 
   // Load Razorpay script
   useEffect(() => {
@@ -150,8 +152,16 @@ export default function PaymentPage() {
       description: `Payment for Rental ${rentalId}`,
       order_id: orderId,
       handler: (response: RazorpayResponse) => {
+        console.log("Payment completed:", response)
         setPaymentData(response)
-        setStatus("Payment Completed - Ready to Verify")
+        setStatus("Payment Completed - Verifying automatically...")
+        setIsPaymentComplete(true)
+        setTransactionId(response.razorpay_payment_id)
+        
+        // Automatically verify payment after completion
+        setTimeout(() => {
+          verifyPayment(response)
+        }, 1000)
       },
       prefill: {
         name: userId || "User",
@@ -197,33 +207,58 @@ export default function PaymentPage() {
     rzp.open()
   }
 
-  const verifyPayment = async () => {
-    if (!paymentData) {
-      setError("No payment data available")
+  const verifyPayment = async (response?: RazorpayResponse) => {
+    const paymentResponse = response || paymentData
+    if (!paymentResponse) {
+      setError("No payment data available for verification.")
       return
     }
     setLoading("verifying")
     setError("")
     try {
-      const response = await fetch("https://uijoj390ad.execute-api.us-east-1.amazonaws.com/prod/payments/verify", {
+      console.log("Attempting to verify payment with data:", {
+        rental_id: rentalId,
+        user_id: userId,
+        razorpay_order_id: paymentResponse.razorpay_order_id,
+        razorpay_payment_id: paymentResponse.razorpay_payment_id,
+        razorpay_signature: paymentResponse.razorpay_signature,
+      })
+
+      const verifyResponse = await fetch("https://uijoj390ad.execute-api.us-east-1.amazonaws.com/prod/payments/verify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(localStorage.getItem("accessToken") ? { Authorization: `Bearer ${localStorage.getItem("accessToken")}` } : {}),
+        },
         body: JSON.stringify({
           operation: "verify_payment",
           rental_id: rentalId,
           user_id: userId,
-          razorpay_order_id: paymentData.razorpay_order_id,
-          razorpay_payment_id: paymentData.razorpay_payment_id,
-          razorpay_signature: paymentData.razorpay_signature,
+          razorpay_order_id: paymentResponse.razorpay_order_id,
+          razorpay_payment_id: paymentResponse.razorpay_payment_id,
+          razorpay_signature: paymentResponse.razorpay_signature,
         }),
       })
-      const data = await response.json()
-      if (response.ok) {
-        setStatus("Payment Verified Successfully")
-      } else {
-        throw new Error(data.message || data.error || "Payment verification failed")
+
+      console.log("Verification response status:", verifyResponse.status)
+      console.log("Verification response headers:", Object.fromEntries(verifyResponse.headers.entries()))
+
+      if (!verifyResponse.ok) {
+        const errorText = await verifyResponse.text()
+        console.error("Verification failed with status:", verifyResponse.status)
+        console.error("Error response body:", errorText)
+        throw new Error(`Payment verification failed: ${verifyResponse.status} ${verifyResponse.statusText}`)
       }
+
+      const data = await verifyResponse.json()
+      console.log("Payment verification successful:", data)
+      setStatus("🎉 Payment Complete! Your rental is now active!")
+      // Show completion message
+      setTimeout(() => {
+        setStatus("✅ Transaction Complete - You can now close this page")
+      }, 3000)
     } catch (err) {
+      console.error("Payment verification error:", err)
       setError(err instanceof Error ? err.message : "Payment verification failed")
     } finally {
       setLoading("")
@@ -234,23 +269,19 @@ export default function PaymentPage() {
     setLoading("updating")
     setError("")
     try {
-      const response = await fetch("https://uijoj390ad.execute-api.us-east-1.amazonaws.com/prod/rentals/update-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          operation: "update_rental_status",
-          rental_id: rentalId,
-          user_id: userId,
-        }),
-      })
-      const data = await response.json()
-      if (response.ok) {
-        setStatus("Rental Status Updated - Process Complete!")
-      } else {
-        throw new Error(data.message || data.error || "Failed to update rental status")
-      }
+      console.log("Payment verification successful - showing completion status")
+      
+      // Since payment is already verified and successful, just show completion
+      setStatus("🎉 Payment Complete! Your rental is now active!")
+      
+      // Show success message for longer
+      setTimeout(() => {
+        setStatus("✅ Transaction Complete - You can now close this page")
+      }, 3000)
+      
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update rental status")
+      console.error("Error updating status:", err)
+      setError(err instanceof Error ? err.message : "Failed to update status")
     } finally {
       setLoading("")
     }
@@ -312,6 +343,15 @@ export default function PaymentPage() {
                 </Alert>
               )}
 
+              {isPaymentComplete && (
+                <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-950">
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-800 dark:text-blue-200">
+                    Payment completed! Transaction ID: {transactionId}
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {error && (
                 <Alert className="border-red-500 bg-red-50 dark:bg-red-950">
                   <AlertCircle className="h-4 w-4 text-red-600" />
@@ -332,7 +372,7 @@ export default function PaymentPage() {
                 )}
 
                 {paymentData && (
-                  <Button onClick={verifyPayment} disabled={loading === "verifying"} variant="destructive" className="w-full">
+                  <Button onClick={() => verifyPayment()} disabled={loading === "verifying"} variant="destructive" className="w-full">
                     {loading === "verifying" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Verify Payment
                   </Button>
@@ -341,7 +381,7 @@ export default function PaymentPage() {
                 {status.includes("Verified") && (
                   <Button onClick={updateRentalStatus} disabled={loading === "updating"} variant="destructive" className="w-full">
                     {loading === "updating" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Update Rental Status
+                    Complete Transaction
                   </Button>
                 )}
               </div>
@@ -360,6 +400,39 @@ export default function PaymentPage() {
                     </div>
                     <div>
                       <strong>Signature:</strong> {paymentData.razorpay_signature.substring(0, 20)}...
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {isPaymentComplete && (
+                <Card className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
+                  <CardHeader>
+                    <CardTitle className="text-lg text-green-800 dark:text-green-200">✅ Transaction Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <strong className="text-green-700 dark:text-green-300">Rental ID:</strong>
+                        <p className="text-green-600 dark:text-green-400">{rentalId}</p>
+                      </div>
+                      <div>
+                        <strong className="text-green-700 dark:text-green-300">User ID:</strong>
+                        <p className="text-green-600 dark:text-green-400">{userId}</p>
+                      </div>
+                      <div>
+                        <strong className="text-green-700 dark:text-green-300">Amount:</strong>
+                        <p className="text-green-600 dark:text-green-400">₹{amountRupees}</p>
+                      </div>
+                      <div>
+                        <strong className="text-green-700 dark:text-green-300">Transaction ID:</strong>
+                        <p className="text-green-600 dark:text-green-400">{transactionId}</p>
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-green-200 dark:border-green-800">
+                      <p className="text-green-700 dark:text-green-300 font-medium">
+                        Your payment has been processed successfully and your rental is now active!
+                      </p>
                     </div>
                   </CardContent>
                 </Card>

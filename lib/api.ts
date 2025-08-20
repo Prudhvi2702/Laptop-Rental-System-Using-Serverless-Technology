@@ -2,9 +2,12 @@
 
 // Types
 interface UserData {
-  username: string;
+  email: string; // Primary field - backend expects this
+  username?: string; // Optional backup
   password: string;
-  email: string;
+  display_name?: string;
+  name?: string;
+  full_name?: string;
 }
 
 interface LaptopData {
@@ -49,10 +52,25 @@ const BASE_URL = "https://uijoj390ad.execute-api.us-east-1.amazonaws.com/prod";
  * Helper function to handle API responses
  */
 const handleResponse = async <T>(response: Response): Promise<T> => {
+  console.log("Raw Response:", {
+    status: response.status,
+    statusText: response.statusText,
+    headers: Object.fromEntries(response.headers.entries()),
+    url: response.url,
+  });
+
   const data = await response.json() as ApiResponse<T>;
 
+  console.log("API Response:", {
+    status: response.status,
+    statusText: response.statusText,
+    data: data,
+  });
+
   if (!response.ok) {
-    throw new Error(data.error || "API request failed");
+    console.error("API Error Response:", data);
+    console.error("HTTP Status:", response.status, response.statusText);
+    throw new Error(data.error || `API request failed: ${response.status} ${response.statusText}`);
   }
 
   return data as T;

@@ -10,19 +10,20 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
+import { registerUser } from "@/lib/api"
 
 export default function RegisterPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
-    email: "",
+    username: "",
     password: "",
     confirmPassword: "",
     display_name: "",
   })
   const [errors, setErrors] = useState({
-    email: "",
+    username: "",
     password: "",
     confirmPassword: "",
     display_name: "",
@@ -31,18 +32,18 @@ export default function RegisterPage() {
   const validateForm = () => {
     let isValid = true
     const newErrors = {
-      email: "",
+      username: "",
       password: "",
       confirmPassword: "",
       display_name: "",
     }
 
-    // Email validation
-    if (!formData.email) {
-      newErrors.email = "Email is required"
+    // Username validation
+    if (!formData.username) {
+      newErrors.username = "Email is required"
       isValid = false
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Email is invalid"
+    } else if (!/\S+@\S+\.\S+/.test(formData.username)) {
+      newErrors.username = "Email is invalid"
       isValid = false
     }
 
@@ -89,35 +90,45 @@ export default function RegisterPage() {
     setIsLoading(true)
 
     try {
-      const response = await fetch("https://uijoj390ad.execute-api.us-east-1.amazonaws.com/prod/users/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          display_name: formData.display_name,
-        }),
+      console.log("Submitting registration data:", {
+        username: formData.username,
+        password: formData.password,
+        email: formData.username,
       })
 
-      const data = await response.json()
+      // Use centralized API function - match backend expectations exactly
+      const data = await registerUser({
+        email: formData.username, // Backend expects 'email' as primary field
+        username: formData.username, // Keep username as backup
+        password: formData.password,
+        display_name: formData.display_name,
+        // Alternative field names
+        name: formData.display_name,
+        full_name: formData.display_name,
+      })
 
-      if (!response.ok) {
-        throw new Error(data.error || "Registration failed")
-      }
+      console.log("Registration response:", data)
 
       toast({
         title: "Registration successful!",
         description: "Please check your email for confirmation code.",
       })
 
-      // Redirect to confirmation page
-      router.push(`/confirm?email=${encodeURIComponent(formData.email)}`)
+      // Add a delay to show the toast, then redirect to confirmation page
+      setTimeout(() => {
+        console.log("Redirecting to confirmation page:", `/confirm?email=${encodeURIComponent(formData.username)}`)
+        router.push(`/confirm?email=${encodeURIComponent(formData.username)}`)
+      }, 2000)
     } catch (error) {
+      console.error("Registration error:", error)
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      })
       toast({
         title: "Registration failed",
-        description: error.message,
+        description: error.message || "An error occurred during registration",
         variant: "destructive",
       })
     } finally {
@@ -162,17 +173,17 @@ export default function RegisterPage() {
                   {errors.display_name && <p className="text-xs text-destructive">{errors.display_name}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="username">Email</Label>
                   <Input
-                    id="email"
-                    name="email"
+                    id="username"
+                    name="username"
                     type="email"
                     placeholder="name@example.com"
-                    value={formData.email}
+                    value={formData.username}
                     onChange={handleChange}
                     required
                   />
-                  {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+                  {errors.username && <p className="text-xs text-destructive">{errors.username}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
