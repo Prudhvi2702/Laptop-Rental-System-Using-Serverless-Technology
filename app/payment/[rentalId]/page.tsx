@@ -139,11 +139,22 @@ export default function PaymentPage() {
       setError("Razorpay is not loaded. Please refresh the page and try again.")
       return
     }
-    const keyId = razorpayKeyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID
-    if (!keyId || keyId === "your_razorpay_key_here") {
-      setError("Razorpay key is not configured. Set NEXT_PUBLIC_RAZORPAY_KEY_ID.")
+    
+    // Use hardcoded Razorpay key for Amplify deployment
+    const keyId = razorpayKeyId || "rzp_live_R73iUC82IipD5J" // Your actual Razorpay live key
+    
+    if (!keyId) {
+      setError("Razorpay key is not configured.")
       return
     }
+
+    console.log("Initiating payment with:", {
+      keyId,
+      orderId,
+      rentalId,
+      userId,
+      amount: amountRupees
+    })
 
     const options = {
       key: keyId,
@@ -181,6 +192,8 @@ export default function PaymentPage() {
       retry: { enabled: true, max_count: 1 },
     }
 
+    console.log("Razorpay options:", options)
+
     const rzp = new window.Razorpay(options)
     try {
       rzp.on?.("payment.failed", (resp: any) => {
@@ -204,6 +217,8 @@ export default function PaymentPage() {
     } catch (e) {
       // Ignore if on() is not available; Razorpay will still show an error in UI
     }
+    
+    console.log("Opening Razorpay checkout...")
     rzp.open()
   }
 
