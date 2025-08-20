@@ -227,6 +227,11 @@ export const createOrder = async (orderData: {
   days: number
 }): Promise<{ orderId: string }> => {
   const token = localStorage.getItem('accessToken') || localStorage.getItem('idToken')
+  const username = localStorage.getItem('username')
+  
+  if (!username) {
+    throw new Error('User not authenticated')
+  }
   
   const response = await fetch(`${BASE_URL}/payments/create-order`, {
     method: 'POST',
@@ -238,6 +243,7 @@ export const createOrder = async (orderData: {
       operation: 'create_order',
       amount: Math.round(orderData.amount * 100), // Convert to paise
       rental_id: orderData.rentalId,
+      user_id: username,
       days: orderData.days,
     }),
   })
