@@ -7,9 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { createOrder, verifyPayment } from '@/lib/api'
+import { createOrder } from '@/lib/api'
 
 declare global {
   interface Window {
@@ -39,7 +38,8 @@ export default function PaymentPage() {
     
     const token = localStorage.getItem('accessToken') || localStorage.getItem('idToken')
     
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://your-api-gateway-url.execute-api.region.amazonaws.com/dev'}/payments/verify`, {
+    // Use your actual API Gateway endpoint
+    fetch('https://uijoj390ad.execute-api.us-east-1.amazonaws.com/prod/payments/verify', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -89,6 +89,27 @@ export default function PaymentPage() {
     })
   }
 
+  // Create Razorpay order function
+  const createRazorpayOrder = async (amount: string) => {
+    try {
+      console.log('🔄 Creating Razorpay order...')
+      
+      const orderData = await createOrder({
+        amount: parseFloat(amount),
+        rentalId: rentalId,
+        days: parseInt(days || '1'),
+      })
+      
+      console.log('✅ Order created:', orderData)
+      setOrderId(orderData.orderId)
+      
+      return orderData.orderId // Return the Razorpay order ID
+    } catch (error) {
+      console.error('❌ Error creating order:', error)
+      return null
+    }
+  }
+
   // Payment handler function - enhanced
   const handlePayment = async () => {
     if (!amount || !days) {
@@ -107,23 +128,25 @@ export default function PaymentPage() {
     console.log('Rental ID:', rentalId)
 
     try {
-      // Create order first
-      const orderData = await createOrder({
-        amount: parseFloat(amount),
-        rentalId: rentalId,
-        days: parseInt(days),
-      })
+      // First create a Razorpay order
+      const razorpayOrderId = await createRazorpayOrder(amount)
       
-      console.log('📋 Order created:', orderData)
-      setOrderId(orderData.orderId)
+      if (!razorpayOrderId) {
+        toast({
+          title: "Order Creation Failed",
+          description: "Failed to create order. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
 
       const options = {
-        key: 'rzp_live_R73iUC82IipD5J', // Your live key
+        key: 'rzp_live_R73iUC82IipD5J', // Your hardcoded live key
         amount: parseFloat(amount) * 100, // Convert to paise
         currency: 'INR',
         name: 'LaptopRent',
         description: `Laptop Rental for ${days} days`,
-        order_id: orderData.orderId,
+        order_id: razorpayOrderId, // Use the created order ID
         handler: function(response: any) {
           console.log('🎉 PAYMENT SUCCESS HANDLER CALLED!', response)
           console.log('Payment ID:', response.razorpay_payment_id)
@@ -175,10 +198,10 @@ export default function PaymentPage() {
         })
       }
     } catch (error) {
-      console.error('❌ Error creating order:', error)
+      console.error('❌ Error in payment process:', error)
       toast({
-        title: "Order Creation Failed",
-        description: "Unable to create payment order",
+        title: "Payment Error",
+        description: "An error occurred during payment processing",
         variant: "destructive",
       })
     } finally {
