@@ -253,7 +253,7 @@ export default function CreateRentalPage() {
   const handleProcessPayment = () => {
     if (rentalId && selectedLaptop) {
       const totalAmount = (selectedLaptop.price_per_day * rentalDaysNumber).toFixed(2)
-      router.push(`/payment/${rentalId}?amount=${totalAmount}`)
+      router.push(`/payment/${rentalId}?amount=${totalAmount}&days=${rentalDaysNumber}`)
     } else {
       toast({
         title: "Error",

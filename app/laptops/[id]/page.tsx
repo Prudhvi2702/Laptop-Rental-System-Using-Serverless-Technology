@@ -111,7 +111,7 @@ export default function LaptopDetailPage({ params }) {
 
     // Redirect to payment page with the rental ID and computed amount
     const totalAmount = (laptop.price_per_day * rentalDays).toFixed(2)
-    router.push(`/payment/${mockRentalId}?amount=${totalAmount}`)
+    router.push(`/payment/${mockRentalId}?amount=${totalAmount}&days=${rentalDays}`)
 
     return mockRentalId
   }
