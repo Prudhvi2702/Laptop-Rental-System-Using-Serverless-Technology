@@ -220,3 +220,27 @@ export const processPayment = async (paymentData: PaymentData, token: string): P
     throw error;
   }
 };
+
+export const createOrder = async (orderData: {
+  amount: number
+  rentalId: string
+  days: number
+}): Promise<{ orderId: string }> => {
+  const token = localStorage.getItem('accessToken') || localStorage.getItem('idToken')
+  
+  const response = await fetch(`${BASE_URL}/payments/create-order`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      operation: 'create_order',
+      amount: Math.round(orderData.amount * 100), // Convert to paise
+      rental_id: orderData.rentalId,
+      days: orderData.days,
+    }),
+  })
+
+  return handleResponse<{ orderId: string }>(response)
+}
